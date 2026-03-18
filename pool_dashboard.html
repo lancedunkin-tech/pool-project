@@ -26,7 +26,7 @@ const {useState,useEffect,useCallback,useRef}=React;
 // ============================================================
 // PERSISTENCE — localStorage read/write
 // ============================================================
-const STORAGE_KEY='pool_dashboard_v3';
+const STORAGE_KEY='pool_dashboard_v4';
 function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{return{}}}
 function saveState(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}
 
