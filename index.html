@@ -26,7 +26,7 @@ const {useState,useEffect,useCallback,useRef}=React;
 // ============================================================
 // PERSISTENCE — localStorage read/write
 // ============================================================
-const STORAGE_KEY='pool_dashboard_v2';
+const STORAGE_KEY='pool_dashboard_v3';
 function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{return{}}}
 function saveState(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}
 
@@ -77,6 +77,17 @@ function StatusSelect({value,onChange}){
   </select>;
 }
 
+// Contract item status dropdown
+const CONTRACT_STATUSES=['Pending','Accepted','Rejected','Discussing'];
+const CONTRACT_STATUS_COLORS={'Pending':'bg-gray-100 text-gray-600','Accepted':'bg-green-100 text-green-700','Rejected':'bg-red-100 text-red-700','Discussing':'bg-amber-100 text-amber-700'};
+
+function ContractStatusSelect({value,onChange}){
+  return <select value={value} onChange={e=>onChange(e.target.value)}
+    className={`text-xs font-medium px-2 py-1 rounded border-0 cursor-pointer ${CONTRACT_STATUS_COLORS[value]||''}`}>
+    {CONTRACT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+  </select>;
+}
+
 function Badge({children,color}){
   const c={red:'bg-red-100 text-red-800',amber:'bg-amber-100 text-amber-800',green:'bg-green-100 text-green-800',blue:'bg-blue-100 text-blue-800',gray:'bg-gray-100 text-gray-600',purple:'bg-purple-100 text-purple-800'};
   return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c[color]||c.gray}`}>{children}</span>;
@@ -104,39 +115,66 @@ function Section({title,children}){
 // ============================================================
 function App(){
   const[activeTab,setActiveTab]=useState('timeline');
-  const[urgentChecks,setUrgentChecks]=usePersist('urgentChecks',{});
+  const[role,setRole]=usePersist('viewRole','homeowner');
+  const isContractor=role==='contractor';
+
+  const[urgentChecks,setUrgentChecks]=usePersist('urgentChecks_v3',{});
   const urgents=[
-    {id:'u1',action:'Finalize contract redlines and send addendum to Burton',owner:'Lance',due:'Mar 19'},
-    {id:'u2',action:'Pick out hot tub model/brand (confirmed YES to hot tub)',owner:'Lance & Missy',due:'Mar 26'},
-    {id:'u3',action:'Decide on patio repour (saves ~$3,600 if skipped)',owner:'Lance & Missy',due:'Mar 19'},
-    {id:'u4',action:'Order pool by Apr 24 → free crystal upgrade ($2,700 value)',owner:'Lance',due:'Apr 24'},
-    {id:'u5',action:'Get Eduardo quotes for French drain + fence restoration',owner:'Whitlee to connect',due:'Mar 26'},
+    {id:'u1',action:'Send contract addendum to Burton',owner:'Lance',due:'This week'},
+    {id:'u2',action:'Pick hot tub model',owner:'Lance & Missy',due:'By Apr'},
+    {id:'u3',action:'Order pool by Apr 24 for free crystal upgrade',owner:'Lance',due:'Apr 24'},
+    {id:'u4',action:'Get Eduardo quotes (French drain, fence, landscaping)',owner:'Whitlee to connect',due:'ASAP'},
+    {id:'u5',action:'Verify concrete square footage (1,270 vs ~1,100 discussed)',owner:'Lance',due:'Before signing'},
   ];
   const toggleUrgent=(id)=>setUrgentChecks(p=>({...p,[id]:!p[id]}));
   const completedUrgent=Object.values(urgentChecks).filter(Boolean).length;
 
+  // Tabs visible to contractor
+  const visibleTabs=isContractor?TABS.filter(t=>['timeline','tasks','orders','comms','financial'].includes(t.id)):TABS;
+  // If contractor switches and is on a hidden tab, reset
+  useEffect(()=>{
+    if(isContractor&&!['timeline','tasks','orders','comms','financial'].includes(activeTab)){
+      setActiveTab('timeline');
+    }
+  },[isContractor]);
+
   return <div className="min-h-screen bg-gray-50">
+    {/* HEADER */}
     <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white px-6 py-4">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div><h1 className="text-2xl font-bold">Pool Project Dashboard</h1>
-          <p className="text-blue-100 text-sm">Lance & Missy Dunkin | 1812 Hayfield Ave, Bentonville, AR | Burton Pools</p></div>
+      <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{isContractor?'Pool Project Tracker':'Pool Project Dashboard'}</h1>
+          <p className="text-blue-100 text-sm">{isContractor?'Dunkin Family & Burton Construction — Pool Project Tracker':'Dunkin Family & Burton Construction — Pool Project Tracker'}</p>
+          {isContractor&&<p className="text-blue-200 text-xs mt-1">Welcome, Whitlee</p>}
+        </div>
         <div className="text-right text-sm">
-          <div className="font-semibold">Latham Claremont 14×33'</div>
+          <div className="font-semibold text-lg">Project Total: $99,456.50</div>
+          <div className="text-blue-200">Latham Claremont 14x33'</div>
           <div className="text-blue-200">Target Start: First week of May 2026</div>
-          <div className="text-blue-200 text-xs mt-1">Heater ✓ | Hot Tub ✓ (picking model)</div></div>
+          <div className="text-blue-200 text-xs mt-1">Heater &#10003; | Hot Tub &#10003; (picking model)</div>
+        </div>
+      </div>
+      {/* Role Toggle */}
+      <div className="max-w-7xl mx-auto mt-2 no-print">
+        <div className="text-xs text-blue-200 flex items-center gap-2">
+          <span>Viewing as:</span>
+          <button onClick={()=>setRole('homeowner')} className={`px-2 py-0.5 rounded transition ${role==='homeowner'?'bg-white text-blue-700 font-semibold':'text-blue-100 hover:text-white'}`}>Homeowner</button>
+          <span className="text-blue-300">|</span>
+          <button onClick={()=>setRole('contractor')} className={`px-2 py-0.5 rounded transition ${role==='contractor'?'bg-white text-blue-700 font-semibold':'text-blue-100 hover:text-white'}`}>Contractor</button>
+        </div>
       </div>
     </div>
 
     {/* Urgent Actions */}
     <div className="bg-red-50 border-b border-red-200 px-6 py-3">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-sm font-bold text-red-800 mb-2">🔴 WHAT'S NEXT — {completedUrgent}/{urgents.length} done</h2>
+        <h2 className="text-sm font-bold text-red-800 mb-2">WHAT'S NEXT -- {completedUrgent}/{urgents.length} done</h2>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
           {urgents.map(a=>(
             <label key={a.id} className={`text-xs p-2 rounded border cursor-pointer flex gap-2 items-start transition ${urgentChecks[a.id]?'bg-green-50 border-green-300 line-through opacity-60':'bg-red-100 border-red-300'}`}>
               <input type="checkbox" checked={!!urgentChecks[a.id]} onChange={()=>toggleUrgent(a.id)} className="mt-0.5 shrink-0"/>
               <div><div className="font-semibold text-gray-900">{a.action}</div>
-                <div className="text-gray-500 mt-1">{a.owner} · {a.due}</div></div>
+                <div className="text-gray-500 mt-1">{a.owner} -- {a.due}</div></div>
             </label>
           ))}
         </div>
@@ -146,7 +184,7 @@ function App(){
     {/* Tabs */}
     <div className="bg-white border-b shadow-sm px-6 no-print">
       <div className="max-w-7xl mx-auto flex space-x-1 overflow-x-auto">
-        {TABS.map(tab=><button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+        {visibleTabs.map(tab=><button key={tab.id} onClick={()=>setActiveTab(tab.id)}
           className={`px-4 py-3 text-sm whitespace-nowrap transition ${activeTab===tab.id?'tab-active':'text-gray-500 hover:text-gray-800'}`}>
           {tab.icon} {tab.label}</button>)}
       </div>
@@ -154,11 +192,11 @@ function App(){
 
     <div className="max-w-7xl mx-auto px-6 py-6">
       {activeTab==='timeline'&&<TimelineTab/>}
-      {activeTab==='financial'&&<FinancialTab/>}
-      {activeTab==='tasks'&&<TasksTab/>}
-      {activeTab==='contract'&&<ContractTab/>}
+      {activeTab==='financial'&&<FinancialTab isContractor={isContractor}/>}
+      {activeTab==='tasks'&&<TasksTab isContractor={isContractor}/>}
+      {activeTab==='contract'&&<ContractTab isContractor={isContractor}/>}
       {activeTab==='orders'&&<OrdersTab/>}
-      {activeTab==='risks'&&<RisksTab/>}
+      {activeTab==='risks'&&!isContractor&&<RisksTab/>}
       {activeTab==='comms'&&<CommsTab/>}
     </div>
   </div>;
@@ -172,7 +210,7 @@ function TimelineTab(){
   const toggle=(id)=>setChecks(p=>({...p,[id]:!p[id]}));
 
   const phases=[
-    {phase:'Pre-Construction',color:'bg-blue-500',dateRange:'Mar 12 – Apr 24, 2026',items:[
+    {phase:'Pre-Construction',color:'bg-blue-500',dateRange:'Mar 12 - Apr 24, 2026',items:[
       {id:'t1',task:'Contract redline & negotiation',date:'Mar 12-19',critical:true},
       {id:'t2',task:'Contract signing',date:'Mar 19-26',critical:true},
       {id:'t3',task:'Order pool shell (crystal upgrade deadline Apr 24)',date:'By Apr 24',critical:true},
@@ -180,25 +218,25 @@ function TimelineTab(){
       {id:'t5',task:'Utility locate (811 call)',date:'After signing',critical:false},
       {id:'t6',task:'Connect with Eduardo for French drain + fence quote',date:'Mar 19-26',critical:false},
       {id:'t7',task:'Pick out hot tub model/brand',date:'Mar 19-Apr',critical:false},
-      {id:'t8',task:'Pre-dig yard prep — remove trampoline, clear left-side access',date:'Late Apr',critical:false},
-      {id:'t9',task:'Notify neighbors (courtesy — equipment noise)',date:'Late Apr',critical:false},
+      {id:'t8',task:'Pre-dig yard prep -- remove trampoline, clear left-side access',date:'Late Apr',critical:false},
+      {id:'t9',task:'Notify neighbors (courtesy -- equipment noise)',date:'Late Apr',critical:false},
     ]},
-    {phase:'Construction',color:'bg-amber-500',dateRange:'First week May – mid-June (4-5 wks)',items:[
+    {phase:'Construction',color:'bg-amber-500',dateRange:'First week May - mid-June (4-5 wks)',items:[
       {id:'t10',task:'Fence takedown (far side from driveway)',date:'Week 1',critical:true},
       {id:'t11',task:'Excavation / dig',date:'Week 1',critical:true},
       {id:'t12',task:'Shell delivery & set',date:'Week 1-2',critical:true},
       {id:'t13',task:'Plumbing (return ports NOT in front of skimmers)',date:'Week 2',critical:true},
-      {id:'t14',task:'Electrical (standard included in quote)',date:'Week 2-3',critical:false},
+      {id:'t14',task:'Electrical (standard included in contract)',date:'Week 2-3',critical:false},
       {id:'t15',task:'Backfill & grading around pool',date:'Week 3',critical:false},
       {id:'t16',task:'Gutter tie-ins underground (3 gutters)',date:'Week 3',critical:false},
-      {id:'t17',task:'Deck drain installation',date:'Week 3',critical:false},
-      {id:'t18',task:'Concrete pour — pool deck, patio, basketball pad',date:'Week 3-4',critical:true},
+      {id:'t17',task:'Deck drain installation (Cardinal, 30\')',date:'Week 3',critical:false},
+      {id:'t18',task:'Concrete pour -- pool deck, patio overlay, basketball pad (1,270 sf)',date:'Week 3-4',critical:true},
       {id:'t19',task:'Equipment install (pump, filter, salt, automation)',date:'Week 4',critical:false},
-      {id:'t20',task:'Heater install',date:'Week 4',critical:false},
+      {id:'t20',task:'Heater install (crosswind w/ chill)',date:'Week 4',critical:false},
       {id:'t21',task:'Fill pool & water balancing',date:'Week 4-5',critical:false},
       {id:'t22',task:'Safety cover install',date:'Week 4-5',critical:false},
     ]},
-    {phase:'Post-Construction',color:'bg-green-500',dateRange:'Mid-June – July 2026',items:[
+    {phase:'Post-Construction',color:'bg-green-500',dateRange:'Mid-June - July 2026',items:[
       {id:'t23',task:'Eduardo: French drain, landscaping, fence restoration',date:'Week 5-6',critical:false},
       {id:'t24',task:'Hot tub delivery & placement on concrete pad',date:'After concrete',critical:false},
       {id:'t25',task:'Final municipal inspection',date:'After completion',critical:true},
@@ -213,9 +251,9 @@ function TimelineTab(){
   const done=Object.values(checks).filter(Boolean).length;
 
   return <div className="space-y-6">
-    <Card title={`📅 Project Timeline — ${done}/${total} milestones complete`}>
+    <Card title={`Project Timeline -- ${done}/${total} milestones complete`}>
       <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
-        <strong>Key Dates:</strong> Burton scheduling first week of May. 4-5 weeks build. Crystal upgrade FREE if ordered by Apr 24. <strong>Heater: CONFIRMED ($5,400). Hot tub: CONFIRMED ($5-7K, model TBD).</strong>
+        <strong>Key Dates:</strong> Burton scheduling first week of May. 4-5 weeks build. Crystal upgrade FREE if ordered by Apr 24. <strong>Heater: CONFIRMED ($5,400). Hot tub: CONFIRMED ($5-7K, model TBD). Contract: $99,456.50.</strong>
       </div>
       {/* Progress bar */}
       <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
@@ -237,7 +275,7 @@ function TimelineTab(){
                 ${!checks[item.id]&&item.critical?'bg-amber-50 border-l-2 border-amber-400':'hover:bg-gray-50'}`}>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" checked={!!checks[item.id]} onChange={()=>toggle(item.id)} className="shrink-0"/>
-                  {item.critical&&!checks[item.id]&&<span className="text-amber-500 text-xs">⚡</span>}
+                  {item.critical&&!checks[item.id]&&<span className="text-amber-500 text-xs">*</span>}
                   <span className={checks[item.id]?'line-through text-gray-400':item.critical?'font-medium':''}>{item.task}</span>
                 </div>
                 <span className="text-xs text-gray-400">{item.date}</span>
@@ -248,11 +286,11 @@ function TimelineTab(){
       })}
     </Card>
 
-    <Card title="🌦 NWA Weather & Seasonal Notes">
+    <Card title="NWA Weather & Seasonal Notes">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
         <div className="p-3 bg-blue-50 rounded"><strong>Spring (Apr-May):</strong> Frequent rain in NWA. April averages 12 rain days. Excavation and concrete pours can be delayed.</div>
-        <div className="p-3 bg-amber-50 rounded"><strong>Concrete Curing:</strong> Ideal 50-90°F. May/June is perfect. Avoid pours during rain. 24-48hrs to set, 28 days full cure.</div>
-        <div className="p-3 bg-green-50 rounded"><strong>Target Swim Date:</strong> If start first week May + 5 weeks = pool swimmable early-mid June — right at summer break! 🎉</div>
+        <div className="p-3 bg-amber-50 rounded"><strong>Concrete Curing:</strong> Ideal 50-90 F. May/June is perfect. Avoid pours during rain. 24-48hrs to set, 28 days full cure.</div>
+        <div className="p-3 bg-green-50 rounded"><strong>Target Swim Date:</strong> If start first week May + 5 weeks = pool swimmable early-mid June -- right at summer break!</div>
       </div>
     </Card>
 
@@ -269,7 +307,7 @@ function FamilyCalendar(){
   const removeEvent=(i)=>setEvents(p=>p.filter((_,j)=>j!==i));
   const updateEvent=(i,field,val)=>setEvents(p=>p.map((e,j)=>j===i?{...e,[field]:val}:e));
 
-  return <Card title="👨‍👩‍👧‍👦 Family Calendar Overlay">
+  return <Card title="Family Calendar Overlay">
     <table className="w-full text-sm">
       <thead><tr className="bg-gray-50"><th className="text-left p-2">Date</th><th className="text-left p-2">Event</th><th className="text-left p-2">Notes / Conflict</th><th className="p-2 w-8"></th></tr></thead>
       <tbody>
@@ -277,7 +315,7 @@ function FamilyCalendar(){
           <td className="p-2"><EditCell value={e.date} onChange={v=>updateEvent(i,'date',v)} placeholder="Date"/></td>
           <td className="p-2"><EditCell value={e.event} onChange={v=>updateEvent(i,'event',v)} placeholder="Event name"/></td>
           <td className="p-2"><EditCell value={e.conflict} onChange={v=>updateEvent(i,'conflict',v)} placeholder="Notes"/></td>
-          <td className="p-2"><button onClick={()=>removeEvent(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button></td>
+          <td className="p-2"><button onClick={()=>removeEvent(i)} className="text-red-400 hover:text-red-600 text-xs">x</button></td>
         </tr>)}
       </tbody>
     </table>
@@ -288,143 +326,158 @@ function FamilyCalendar(){
 // ============================================================
 // TAB 2: FINANCIAL
 // ============================================================
-function FinancialTab(){
+function FinancialTab({isContractor}){
   return <div className="space-y-6">
     {/* Summary Cards */}
     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       <div className="bg-blue-600 text-white rounded-lg p-4">
-        <div className="text-xs text-blue-200">Pool Contract</div>
-        <div className="text-2xl font-bold">$79,200</div>
-        <div className="text-xs text-blue-200">Claremont 14×33'</div></div>
-      <div className="bg-amber-600 text-white rounded-lg p-4">
-        <div className="text-xs text-amber-200">Extra Concrete + Site</div>
-        <div className="text-2xl font-bold">~$13,200</div>
-        <div className="text-xs text-amber-200">~1,100 sqft × $12</div></div>
+        <div className="text-xs text-blue-200">Pool Contract (Burton)</div>
+        <div className="text-2xl font-bold">$99,456.50</div>
+        <div className="text-xs text-blue-200">Claremont 14x33' + all upgrades</div></div>
       <div className="bg-purple-600 text-white rounded-lg p-4">
-        <div className="text-xs text-purple-200">Heater + Hot Tub</div>
-        <div className="text-2xl font-bold">~$12,400</div>
-        <div className="text-xs text-purple-200">$5,400 + ~$7,000</div></div>
-      <div className="bg-green-600 text-white rounded-lg p-4">
-        <div className="text-xs text-green-200">Landscaping + Other</div>
+        <div className="text-xs text-purple-200">Hot Tub (separate)</div>
         <div className="text-2xl font-bold">~$7,000</div>
-        <div className="text-xs text-green-200">Eduardo + furniture</div></div>
+        <div className="text-xs text-purple-200">Picking model</div></div>
+      <div className="bg-green-600 text-white rounded-lg p-4">
+        <div className="text-xs text-green-200">Landscaping / Eduardo</div>
+        <div className="text-2xl font-bold">~$5,000</div>
+        <div className="text-xs text-green-200">French drain, fence, grading</div></div>
+      <div className="bg-amber-600 text-white rounded-lg p-4">
+        <div className="text-xs text-amber-200">Furniture & Accessories</div>
+        <div className="text-2xl font-bold">~$2,500</div>
+        <div className="text-xs text-amber-200">Loungers, table, hoop</div></div>
       <div className="bg-red-600 text-white rounded-lg p-4">
-        <div className="text-xs text-red-200">Estimated All-In</div>
-        <div className="text-2xl font-bold">~$111,800</div>
-        <div className="text-xs text-red-200">+ contingency</div></div>
+        <div className="text-xs text-red-200">All-In Total</div>
+        <div className="text-2xl font-bold">~$114,000</div>
+        <div className="text-xs text-red-200">+ 10% contingency</div></div>
     </div>
 
-    <Card title="💰 Complete Cost Breakdown">
+    <Card title="Complete Cost Breakdown">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-left"><th className="p-2">Item</th><th className="p-2">Source</th><th className="p-2 text-right">Cost</th><th className="p-2">Status</th></tr></thead>
         <tbody>
-          <tr className="border-t font-semibold bg-blue-50"><td className="p-2" colSpan="4">POOL CONTRACT (Burton) — $79,200</td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Latham Claremont 14×33' Fiberglass Shell + Install</td><td className="p-2">Quote</td><td className="p-2 text-right">$83,450</td><td className="p-2"><Badge color="blue">Base</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Standard Electrical</td><td className="p-2">Quote</td><td className="p-2 text-right">$2,750</td><td className="p-2"><Badge color="blue">Included</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Salt System + Automation</td><td className="p-2">Quote</td><td className="p-2 text-right text-green-600">FREE</td><td className="p-2"><Badge color="green">Incentive</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Claremont Dealer Discount</td><td className="p-2">Quote</td><td className="p-2 text-right text-green-600">-$7,000</td><td className="p-2"><Badge color="green">Discount</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Crystal Finish Upgrade</td><td className="p-2">Mar 12</td><td className="p-2 text-right text-green-600">FREE</td><td className="p-2"><Badge color="green">If ordered by Apr 24</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Includes: 3' deck, pump, filter, salt, automation, lights, robotic cleaner, safety cover, chemicals, permit, tax</td><td className="p-2"></td><td className="p-2"></td><td className="p-2"></td></tr>
+          <tr className="border-t font-semibold bg-blue-50"><td className="p-2" colSpan="4">POOL CONTRACT (Burton) -- $99,456.50</td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Latham Claremont 14x33' Fiberglass Shell + Install (base)</td><td className="p-2">Contract</td><td className="p-2 text-right">$83,450.00</td><td className="p-2"><Badge color="blue">Base</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Standard Electrical</td><td className="p-2">Contract</td><td className="p-2 text-right">$2,750.00</td><td className="p-2"><Badge color="blue">Included</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Salt System (IC30)</td><td className="p-2">Contract</td><td className="p-2 text-right text-green-600">$1,999 (offset by -$1,999 free incentive = $0 net)</td><td className="p-2"><Badge color="green">Free Incentive</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Free Automation</td><td className="p-2">Contract</td><td className="p-2 text-right text-green-600">$0</td><td className="p-2"><Badge color="green">Incentive</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Electric Heater w/ Chill (Crosswind)</td><td className="p-2">Contract</td><td className="p-2 text-right">$5,400.00</td><td className="p-2"><Badge color="green">CONFIRMED</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Drainage (3 gutter ties + deck drain)</td><td className="p-2">Contract</td><td className="p-2 text-right">$950.00</td><td className="p-2"><Badge color="green">IN CONTRACT</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Claremont Dealer Discount</td><td className="p-2">Contract</td><td className="p-2 text-right text-green-600">-$7,000.00</td><td className="p-2"><Badge color="green">Discount</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Crystal Finish Upgrade</td><td className="p-2">Latham</td><td className="p-2 text-right text-green-600">$0 (free if ordered by Apr 24)</td><td className="p-2"><Badge color="amber">Need in contract</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Concrete: 1,270 sf @ $10.95/sf</td><td className="p-2">Contract</td><td className="p-2 text-right">$13,906.50</td><td className="p-2"><Badge color="blue">IN CONTRACT</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-10 text-gray-500 text-xs">Breakdown: 360 sf bball court + 350 sf patio overlay + 560 sf extra beyond 3' border | $1/sf discount applied (from $11.95)</td><td className="p-2" colSpan="3"></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Includes: pump, filter, salt, automation, lights, robotic cleaner, safety cover, chemicals, permit, tax, coping, 3' deck border</td><td className="p-2" colSpan="3"></td></tr>
+          <tr className="border-t font-semibold"><td className="p-2 pl-6">Line Items Subtotal (above base)</td><td className="p-2"></td><td className="p-2 text-right font-bold">$16,006.50</td><td className="p-2"></td></tr>
+          <tr className="border-t font-bold bg-blue-100"><td className="p-2 pl-6">CONTRACT TOTAL</td><td className="p-2"></td><td className="p-2 text-right text-xl">$99,456.50</td><td className="p-2"></td></tr>
 
-          <tr className="border-t font-semibold bg-amber-50"><td className="p-2" colSpan="4">EXTRA CONCRETE & SITE WORK — ~$13,200</td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Patio repour (4" overlay, ~300 sqft)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">~$3,600</td><td className="p-2"><Badge color="amber">DECISION: skip to save?</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">8' concrete — house side (~240 sqft)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">~$2,880</td><td className="p-2"><Badge color="blue">Planned</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Extra concrete — walkways (~200 sqft)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">~$2,400</td><td className="p-2"><Badge color="blue">Planned</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Basketball pad (15×20 = 300 sqft)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">~$3,600</td><td className="p-2"><Badge color="blue">Planned</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Gutter tie-ins (3 × $250)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">$750</td><td className="p-2"><Badge color="blue">Planned</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Deck drain + umbrella anchors</td><td className="p-2">Mar 12</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="amber">NEED PRICE</Badge></td></tr>
+          <tr className="border-t font-semibold bg-gray-100"><td className="p-2" colSpan="4">NOT IN CONTRACT (separate purchases)</td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Hot Tub (above-ground, model TBD)</td><td className="p-2">Separate</td><td className="p-2 text-right">~$5,000-$7,000</td><td className="p-2"><Badge color="amber">Picking model</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Landscaping / French drain (Eduardo)</td><td className="p-2">Separate</td><td className="p-2 text-right">~$4,000-$5,000</td><td className="p-2"><Badge color="amber">Eduardo to quote</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Furniture & accessories</td><td className="p-2">Homeowner</td><td className="p-2 text-right">~$2,000-$3,000</td><td className="p-2"><Badge color="gray">Homeowner</Badge></td></tr>
+          <tr className="border-t"><td className="p-2 pl-6">Fence restoration</td><td className="p-2">Separate</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="amber">Eduardo to quote</Badge></td></tr>
 
-          <tr className="border-t font-semibold bg-purple-50"><td className="p-2" colSpan="4">HEATER & HOT TUB — ~$12,400 (CONFIRMED)</td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Pool Heater</td><td className="p-2">Mar 12</td><td className="p-2 text-right font-semibold">$5,400</td><td className="p-2"><Badge color="green">CONFIRMED ✓</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Above-Ground Hot Tub (sits on concrete pad)</td><td className="p-2">Mar 12</td><td className="p-2 text-right font-semibold">~$7,000</td><td className="p-2"><Badge color="amber">CONFIRMED ✓ — picking model</Badge></td></tr>
-
-          <tr className="border-t font-semibold bg-green-50"><td className="p-2" colSpan="4">LANDSCAPING & THIRD-PARTY (Eduardo) — ~$5,000</td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">French drain (side yard)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="amber">Eduardo to quote</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Gravel, rock, decorative fill</td><td className="p-2">Mar 12</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="amber">Eduardo to quote</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Fence restoration (far side)</td><td className="p-2">Mar 12</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="amber">Eduardo to quote</Badge></td></tr>
-
-          <tr className="border-t font-semibold bg-gray-100"><td className="p-2" colSpan="4">OTHER COSTS</td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Outdoor furniture (loungers, table, umbrella)</td><td className="p-2">Est.</td><td className="p-2 text-right">~$2,000</td><td className="p-2"><Badge color="gray">Homeowner</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Pool basketball hoop</td><td className="p-2">Est.</td><td className="p-2 text-right">~$300</td><td className="p-2"><Badge color="gray">Homeowner</Badge></td></tr>
-          <tr className="border-t"><td className="p-2 pl-6">Spa screening wall (cosmetic)</td><td className="p-2">Est.</td><td className="p-2 text-right">TBD</td><td className="p-2"><Badge color="gray">Can phase later</Badge></td></tr>
+          <tr className="border-t font-semibold bg-gray-100"><td className="p-2" colSpan="4">OTHER ONGOING COSTS</td></tr>
           <tr className="border-t"><td className="p-2 pl-6">Insurance increase</td><td className="p-2">Est.</td><td className="p-2 text-right">~$300/yr</td><td className="p-2"><Badge color="gray">Call agent</Badge></td></tr>
         </tbody>
       </table>
     </Card>
 
     {/* Budget Summary */}
-    <Card title="📊 Budget Summary">
+    <Card title="Budget Summary">
       <table className="w-full text-sm">
         <tbody>
-          <tr className="border-b"><td className="p-3 font-medium">Pool Contract (Burton)</td><td className="p-3 text-right font-bold">$79,200</td></tr>
-          <tr className="border-b"><td className="p-3 font-medium">Extra Concrete & Site Work</td><td className="p-3 text-right font-bold">~$13,200</td></tr>
-          <tr className="border-b"><td className="p-3 font-medium">Heater</td><td className="p-3 text-right font-bold">$5,400</td></tr>
-          <tr className="border-b"><td className="p-3 font-medium">Hot Tub</td><td className="p-3 text-right font-bold">~$7,000</td></tr>
-          <tr className="border-b"><td className="p-3 font-medium">Landscaping / Eduardo</td><td className="p-3 text-right font-bold">~$5,000</td></tr>
-          <tr className="border-b"><td className="p-3 font-medium">Furniture & Accessories</td><td className="p-3 text-right font-bold">~$2,000</td></tr>
-          <tr className="border-b bg-blue-50"><td className="p-3 font-bold text-lg">ALL-IN TOTAL</td><td className="p-3 text-right font-bold text-xl text-blue-700">~$111,800</td></tr>
-          <tr className="border-b bg-amber-50"><td className="p-3 font-bold">10% Contingency Reserve</td><td className="p-3 text-right font-bold text-amber-700">~$11,200</td></tr>
-          <tr className="bg-red-50"><td className="p-3 font-bold text-lg">TOTAL WITH CONTINGENCY</td><td className="p-3 text-right font-bold text-2xl text-red-700">~$123,000</td></tr>
+          <tr className="border-b"><td className="p-3 font-medium">Pool Contract (Burton)</td><td className="p-3 text-right font-bold">$99,456.50</td></tr>
+          <tr className="border-b"><td className="p-3 font-medium">Hot Tub (separate)</td><td className="p-3 text-right font-bold">~$7,000</td></tr>
+          <tr className="border-b"><td className="p-3 font-medium">Landscaping / Eduardo (separate)</td><td className="p-3 text-right font-bold">~$5,000</td></tr>
+          <tr className="border-b"><td className="p-3 font-medium">Furniture & Accessories</td><td className="p-3 text-right font-bold">~$2,500</td></tr>
+          <tr className="border-b bg-blue-50"><td className="p-3 font-bold text-lg">ALL-IN TOTAL</td><td className="p-3 text-right font-bold text-xl text-blue-700">~$114,000</td></tr>
+          <tr className="border-b bg-amber-50"><td className="p-3 font-bold">10% Contingency Reserve</td><td className="p-3 text-right font-bold text-amber-700">~$11,400</td></tr>
+          <tr className="bg-red-50"><td className="p-3 font-bold text-lg">TOTAL WITH CONTINGENCY</td><td className="p-3 text-right font-bold text-2xl text-red-700">~$125,400</td></tr>
         </tbody>
       </table>
 
-      <div className="mt-4 p-4 bg-gray-50 rounded border">
-        <h4 className="font-bold text-sm mb-2">📌 Grand Total WITHOUT Heater & Hot Tub</h4>
+      {!isContractor&&<div className="mt-4 p-4 bg-gray-50 rounded border">
+        <h4 className="font-bold text-sm mb-2">WITHOUT Heater & Hot Tub</h4>
         <table className="w-full text-sm">
           <tbody>
-            <tr className="border-b"><td className="p-2">Pool + Concrete + Landscaping + Furniture</td><td className="p-2 text-right font-bold">~$99,400</td></tr>
-            <tr className="border-b"><td className="p-2">10% Contingency</td><td className="p-2 text-right font-bold">~$9,940</td></tr>
-            <tr className="bg-gray-200"><td className="p-2 font-bold">Total (pool project only, no heater/tub)</td><td className="p-2 text-right font-bold text-lg">~$109,340</td></tr>
+            <tr className="border-b"><td className="p-2">Contract minus heater ($5,400)</td><td className="p-2 text-right font-bold">$94,056.50</td></tr>
+            <tr className="border-b"><td className="p-2">Plus landscaping + furniture (~$7,500)</td><td className="p-2 text-right font-bold">~$101,556.50</td></tr>
+            <tr className="border-b"><td className="p-2">10% Contingency</td><td className="p-2 text-right font-bold">~$10,156</td></tr>
+            <tr className="bg-gray-200"><td className="p-2 font-bold">Total (no heater, no hot tub)</td><td className="p-2 text-right font-bold text-lg">~$111,700</td></tr>
           </tbody>
         </table>
-        <p className="text-xs text-gray-500 mt-2">Heater ($5,400) and hot tub (~$7,000) add $12,400 on top. Both confirmed — but shown separately so you can see the base project cost.</p>
-      </div>
+        <p className="text-xs text-gray-500 mt-2">Heater ($5,400) and hot tub (~$7,000) add ~$12,400 on top. Both confirmed -- but shown separately so you can see the base project cost.</p>
+      </div>}
     </Card>
 
     {/* Payment Schedule */}
-    <Card title="💳 Payment Schedule (Burton Contract — $79,200)">
-      <div className="p-3 bg-red-50 rounded text-sm mb-3">
-        <strong>⚠️ REDLINE:</strong> Final draw is only $1,000 (1.3%). Increase to $7,920 (10%) for punch list leverage. See Contract tab.
+    <Card title="Payment / Draw Schedule -- $99,456.50">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Current Contract */}
+        <div>
+          <h4 className="font-bold text-sm mb-2">Current Contract Schedule</h4>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50"><th className="p-2 text-left">Draw</th><th className="p-2 text-right">Amount</th></tr></thead>
+            <tbody>
+              <tr className="border-t"><td className="p-2">Deposit 1 (non-refundable)</td><td className="p-2 text-right">$10,000.00</td></tr>
+              <tr className="border-t"><td className="p-2">Deposit 2 - shell ships (non-refundable)</td><td className="p-2 text-right">$10,000.00</td></tr>
+              <tr className="border-t"><td className="p-2">Delivery of Pool to Job Site</td><td className="p-2 text-right">$39,228.25</td></tr>
+              <tr className="border-t"><td className="p-2">Ready for Water</td><td className="p-2 text-right">$23,536.95</td></tr>
+              <tr className="border-t"><td className="p-2">Deck Poured</td><td className="p-2 text-right">$15,691.30</td></tr>
+              <tr className="border-t bg-red-50"><td className="p-2 font-bold">Final -- Upon Completion</td><td className="p-2 text-right font-bold text-red-600">$1,000.00</td></tr>
+              <tr className="border-t font-bold"><td className="p-2">TOTAL</td><td className="p-2 text-right">$99,456.50</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Proposed Redlined */}
+        {!isContractor&&<div>
+          <h4 className="font-bold text-sm mb-2 text-red-700">Proposed (Redlined) Schedule</h4>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-red-50"><th className="p-2 text-left">Draw</th><th className="p-2 text-right">Amount</th></tr></thead>
+            <tbody>
+              <tr className="border-t"><td className="p-2">Deposit 1 (non-refundable)</td><td className="p-2 text-right">$10,000.00</td></tr>
+              <tr className="border-t"><td className="p-2">Deposit 2 - shell ships (non-refundable)</td><td className="p-2 text-right">$10,000.00</td></tr>
+              <tr className="border-t bg-green-50"><td className="p-2 font-medium">Delivery of Pool to Job Site</td><td className="p-2 text-right font-bold text-green-700">$30,282.25 (reduced)</td></tr>
+              <tr className="border-t"><td className="p-2">Ready for Water</td><td className="p-2 text-right">$23,536.95</td></tr>
+              <tr className="border-t"><td className="p-2">Deck Poured</td><td className="p-2 text-right">$15,691.30</td></tr>
+              <tr className="border-t bg-green-50"><td className="p-2 font-bold">Final -- Upon Completion (10%)</td><td className="p-2 text-right font-bold text-green-700">$9,946.00 (increased)</td></tr>
+              <tr className="border-t font-bold"><td className="p-2">TOTAL</td><td className="p-2 text-right">$99,456.50</td></tr>
+            </tbody>
+          </table>
+          <p className="text-xs text-red-600 mt-2">Goal: increase final holdback to 10% ($9,946) for punch list leverage. Reduce delivery draw by $8,946 to compensate.</p>
+        </div>}
       </div>
-      <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50"><th className="p-2 text-left">Draw</th><th className="p-2">Trigger</th><th className="p-2 text-right">Amount</th><th className="p-2 text-right">Cumulative</th><th className="p-2 text-right">% Paid</th></tr></thead>
-        <tbody>
-          <tr className="border-t"><td className="p-2">Deposit #1</td><td className="p-2">At signing</td><td className="p-2 text-right">$10,000</td><td className="p-2 text-right">$10,000</td><td className="p-2 text-right">12.6%</td></tr>
-          <tr className="border-t"><td className="p-2">Deposit #2</td><td className="p-2">Shell ordered</td><td className="p-2 text-right">$10,000</td><td className="p-2 text-right">$20,000</td><td className="p-2 text-right">25.3%</td></tr>
-          <tr className="border-t"><td className="p-2">Draw 3</td><td className="p-2">Shell delivery</td><td className="p-2 text-right">$29,200</td><td className="p-2 text-right">$49,200</td><td className="p-2 text-right text-red-600 font-bold">62.1%</td></tr>
-          <tr className="border-t"><td className="p-2">Draw 4</td><td className="p-2">Concrete pour</td><td className="p-2 text-right">$15,000</td><td className="p-2 text-right">$64,200</td><td className="p-2 text-right">81.1%</td></tr>
-          <tr className="border-t"><td className="p-2">Draw 5</td><td className="p-2">Equipment start</td><td className="p-2 text-right">$14,000</td><td className="p-2 text-right">$78,200</td><td className="p-2 text-right">98.7%</td></tr>
-          <tr className="border-t bg-red-50"><td className="p-2 font-bold">Final</td><td className="p-2">Completion</td><td className="p-2 text-right font-bold text-red-600">$1,000</td><td className="p-2 text-right">$79,200</td><td className="p-2 text-right">100%</td></tr>
-        </tbody>
-      </table>
     </Card>
 
-    <Card title="📈 Quote History: 2025 → 2026">
+    <Card title="Quote History: 2025 to 2026">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50"><th className="p-2 text-left">Quote</th><th className="p-2">Date</th><th className="p-2">Type</th><th className="p-2">Size</th><th className="p-2 text-right">Total</th></tr></thead>
         <tbody>
-          <tr className="border-t text-gray-400"><td className="p-2">Aruba Fiberglass</td><td className="p-2">Sep 2025</td><td className="p-2">Fiberglass</td><td className="p-2">11×22'</td><td className="p-2 text-right">$50,750</td></tr>
-          <tr className="border-t text-gray-400"><td className="p-2">Rectangle Vinyl</td><td className="p-2">Sep 2025</td><td className="p-2">Vinyl</td><td className="p-2">12×24'</td><td className="p-2 text-right">$57,687</td></tr>
-          <tr className="border-t text-gray-400"><td className="p-2">Kingston Fiberglass</td><td className="p-2">Feb 2026</td><td className="p-2">Fiberglass</td><td className="p-2">16×38'</td><td className="p-2 text-right">$92,700</td></tr>
-          <tr className="border-t font-bold bg-blue-50"><td className="p-2">Claremont ✓</td><td className="p-2">Feb 2026</td><td className="p-2">Fiberglass</td><td className="p-2">14×33'</td><td className="p-2 text-right">$79,200</td></tr>
+          <tr className="border-t text-gray-400"><td className="p-2">Aruba Fiberglass</td><td className="p-2">Sep 2025</td><td className="p-2">Fiberglass</td><td className="p-2">11x22'</td><td className="p-2 text-right">$50,750</td></tr>
+          <tr className="border-t text-gray-400"><td className="p-2">Rectangle Vinyl</td><td className="p-2">Sep 2025</td><td className="p-2">Vinyl</td><td className="p-2">12x24'</td><td className="p-2 text-right">$57,687</td></tr>
+          <tr className="border-t text-gray-400"><td className="p-2">Kingston Fiberglass</td><td className="p-2">Feb 2026</td><td className="p-2">Fiberglass</td><td className="p-2">16x38'</td><td className="p-2 text-right">$92,700</td></tr>
+          <tr className="border-t text-gray-400"><td className="p-2">Claremont (base, no heater/concrete/drainage)</td><td className="p-2">Feb 2026</td><td className="p-2">Fiberglass</td><td className="p-2">14x33'</td><td className="p-2 text-right">$79,200</td></tr>
+          <tr className="border-t font-bold bg-blue-50"><td className="p-2">Claremont FULL CONTRACT (current)</td><td className="p-2">Mar 2026</td><td className="p-2">Fiberglass</td><td className="p-2">14x33'</td><td className="p-2 text-right">$99,456.50</td></tr>
         </tbody>
       </table>
     </Card>
 
-    <Card title="🏊 Annual Ownership Costs">
+    <Card title="Annual Ownership Costs">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
         <div className="p-3 bg-blue-50 rounded">
           <h4 className="font-bold mb-2">Year 1</h4>
-          <div>Build: ~$111,800</div><div>Insurance: ~$300</div><div>Chemicals: ~$600</div><div>Electricity: ~$600 (partial)</div>
-          <div className="mt-2 pt-2 border-t font-bold">~$113,300</div></div>
+          <div>Build: ~$114,000</div><div>Insurance: ~$300</div><div>Chemicals: ~$600</div><div>Electricity: ~$600 (partial)</div>
+          <div className="mt-2 pt-2 border-t font-bold">~$115,500</div></div>
         <div className="p-3 bg-green-50 rounded">
           <h4 className="font-bold mb-2">Years 2-5 (per year)</h4>
           <div>Chemicals: ~$800</div><div>Electricity: ~$1,200</div><div>Insurance: ~$300</div><div>Winterization: ~$300</div><div>Repairs: ~$300</div>
           <div className="mt-2 pt-2 border-t font-bold">~$2,900/yr</div></div>
         <div className="p-3 bg-purple-50 rounded">
           <h4 className="font-bold mb-2">5-Year Total</h4>
-          <div>Year 1: ~$113,300</div><div>Years 2-5: ~$11,600</div>
-          <div className="mt-2 pt-2 border-t font-bold text-lg">~$124,900</div>
+          <div>Year 1: ~$115,500</div><div>Years 2-5: ~$11,600</div>
+          <div className="mt-2 pt-2 border-t font-bold text-lg">~$127,100</div>
           <div className="text-xs text-gray-500 mt-1">Fiberglass lasts 30+ years.</div></div>
       </div>
     </Card>
@@ -434,16 +487,16 @@ function FinancialTab(){
 // ============================================================
 // TAB 3: TASKS (fully interactive)
 // ============================================================
-function TasksTab(){
+function TasksTab({isContractor}){
   const defaultTasks=[
     {id:1,task:'Finalize contract redlines (use Meeting Prep doc)',owner:'Lance',cat:'Homeowner',status:'In Progress',due:'Mar 19',pri:'Critical',notes:'Top 5 non-negotiables identified'},
-    {id:2,task:'Pick out hot tub model/brand',owner:'Lance & Missy',cat:'Homeowner',status:'Not Started',due:'Mar 26',pri:'Critical',notes:'Confirmed YES. Need to select specific model.'},
-    {id:3,task:'Decide: Repour existing patio ($3,600 to save)',owner:'Lance & Missy',cat:'Homeowner',status:'Not Started',due:'Mar 19',pri:'High',notes:'New concrete looks seamless, raises 4in'},
-    {id:4,task:'Send redline / addendum to Burton',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Mar 22',pri:'Critical',notes:'After task #1'},
-    {id:5,task:'Sign contract',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Mar 26',pri:'Critical',notes:'After redlines accepted'},
-    {id:6,task:'Position $10K for Deposit #1',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'At signing',pri:'High',notes:''},
-    {id:7,task:'Call insurance — get pool+spa rider quote',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Mar 26',pri:'Medium',notes:''},
-    {id:8,task:'Verify setbacks / get survey if needed',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Before signing',pri:'High',notes:'Neighbor has pool — likely OK'},
+    {id:2,task:'Pick out hot tub model/brand',owner:'Lance & Missy',cat:'Homeowner',status:'Not Started',due:'By Apr',pri:'Critical',notes:'Confirmed YES. Need to select specific model.'},
+    {id:3,task:'Send redline / addendum to Burton',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'This week',pri:'Critical',notes:'After redlines finalized'},
+    {id:4,task:'Sign contract',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'After addendum accepted',pri:'Critical',notes:'After redlines accepted'},
+    {id:5,task:'Position $10K for Deposit #1',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'At signing',pri:'High',notes:''},
+    {id:6,task:'Verify concrete sq ft (1,270 vs ~1,100)',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Before signing',pri:'High',notes:'Contract says 1,270 sf. Confirm breakdown.'},
+    {id:7,task:'Call insurance -- get pool+spa rider quote',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Mar 26',pri:'Medium',notes:''},
+    {id:8,task:'Verify setbacks / get survey if needed',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Before signing',pri:'High',notes:'Neighbor has pool -- likely OK'},
     {id:9,task:'Remove trampoline',owner:'Lance & Missy',cat:'Homeowner',status:'Not Started',due:'Late Apr',pri:'Low',notes:''},
     {id:10,task:'Clear left-side access path',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Late Apr',pri:'Medium',notes:'Equipment enters from street'},
     {id:11,task:'Notify neighbors',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'Late Apr',pri:'Low',notes:''},
@@ -452,23 +505,21 @@ function TasksTab(){
     {id:14,task:'Buy outdoor furniture',owner:'Missy',cat:'Homeowner',status:'Not Started',due:'May-Jun',pri:'Low',notes:''},
     {id:15,task:'Buy pool basketball hoop (~$300)',owner:'Lance',cat:'Homeowner',status:'Not Started',due:'June',pri:'Low',notes:''},
     {id:20,task:'Draw up revised plans (Mar 12 layout)',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'High',notes:'Spray paint layout from visit'},
-    {id:21,task:'Provide updated quote with all concrete extras',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'High',notes:'Trying for better deal'},
-    {id:22,task:'Connect Lance with Eduardo (landscaper)',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'High',notes:'French drain, fence, landscaping'},
-    {id:23,task:'Provide heater quote details (model)',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'Medium',notes:'$5,400 verbal'},
-    {id:24,task:'Provide hot tub options/brands/pricing',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'High',notes:'Confirmed YES — need models to pick from'},
-    {id:25,task:'Provide auto pool cover quote',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 19',pri:'Medium',notes:'Desired for safety'},
-    {id:26,task:'Review and accept contract addendum',owner:'Burton',cat:'Burton',status:'Not Started',due:'Mar 26',pri:'Critical',notes:''},
-    {id:27,task:'Pull permits with City of Bentonville',owner:'Burton',cat:'Burton',status:'Not Started',due:'After signing',pri:'Critical',notes:''},
-    {id:28,task:'Order Claremont shell (by Apr 24 for crystal)',owner:'Burton',cat:'Burton',status:'Not Started',due:'After signing',pri:'Critical',notes:''},
-    {id:29,task:'Provide Certificate of Insurance',owner:'Burton',cat:'Burton',status:'Not Started',due:'Before work',pri:'High',notes:'GL + Workers Comp'},
-    {id:30,task:'Provide AR contractor license #',owner:'Burton',cat:'Burton',status:'Not Started',due:'Before signing',pri:'High',notes:''},
+    {id:21,task:'Provide updated quote with all concrete extras',owner:'Whitlee',cat:'Burton',status:'Complete',due:'Mar 19',pri:'High',notes:'Contract received: $99,456.50'},
+    {id:22,task:'Connect Lance with Eduardo (landscaper)',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'ASAP',pri:'High',notes:'French drain, fence, landscaping'},
+    {id:23,task:'Provide hot tub options/brands/pricing',owner:'Whitlee',cat:'Burton',status:'Not Started',due:'Mar 26',pri:'High',notes:'Confirmed YES -- need models to pick from'},
+    {id:24,task:'Review and accept contract addendum',owner:'Burton',cat:'Burton',status:'Not Started',due:'After addendum sent',pri:'Critical',notes:'16 contract items to review'},
+    {id:25,task:'Pull permits with City of Bentonville',owner:'Burton',cat:'Burton',status:'Not Started',due:'After signing',pri:'Critical',notes:''},
+    {id:26,task:'Order Claremont shell (by Apr 24 for crystal)',owner:'Burton',cat:'Burton',status:'Not Started',due:'After signing',pri:'Critical',notes:''},
+    {id:27,task:'Provide Certificate of Insurance',owner:'Burton',cat:'Burton',status:'Not Started',due:'Before work',pri:'High',notes:'GL + Workers Comp'},
+    {id:28,task:'Provide AR contractor license #',owner:'Burton',cat:'Burton',status:'Not Started',due:'Before signing',pri:'High',notes:''},
     {id:40,task:'French drain installation',owner:'Eduardo',cat:'Third Party',status:'Not Started',due:'During/after build',pri:'High',notes:'While yard is torn up'},
     {id:41,task:'Fence restoration (far side)',owner:'Eduardo',cat:'Third Party',status:'Not Started',due:'After pool',pri:'Medium',notes:''},
     {id:42,task:'Landscaping cleanup & grading',owner:'Eduardo',cat:'Third Party',status:'Not Started',due:'After pool',pri:'Medium',notes:''},
     {id:43,task:'Spa screening wall',owner:'TBD',cat:'Third Party',status:'Not Started',due:'After concrete',pri:'Low',notes:'CMU wall or shrubs to hide hot tub'},
   ];
 
-  const[tasks,setTasks]=usePersist('tasks_v3',defaultTasks);
+  const[tasks,setTasks]=usePersist('tasks_v4',defaultTasks);
   const[filter,setFilter]=useState('all');
   const[showDone,setShowDone]=useState(true);
 
@@ -479,7 +530,9 @@ function TasksTab(){
   };
   const removeTask=(id)=>{if(confirm('Delete this task?'))setTasks(p=>p.filter(t=>t.id!==id))};
 
+  // In contractor mode, only show Burton tasks
   const filtered=tasks.filter(t=>{
+    if(isContractor&&t.cat!=='Burton') return false;
     if(filter!=='all'&&t.cat!==filter) return false;
     if(!showDone&&t.status==='Complete') return false;
     return true;
@@ -487,23 +540,25 @@ function TasksTab(){
 
   const totalDone=tasks.filter(t=>t.status==='Complete').length;
 
+  const filterOptions=isContractor?['all']:['all','Homeowner','Burton','Third Party'];
+
   return <div className="space-y-4">
     <div className="flex justify-between items-center flex-wrap gap-2">
       <div className="flex gap-2 flex-wrap">
-        {['all','Homeowner','Burton','Third Party'].map(f=>
+        {filterOptions.map(f=>
           <button key={f} onClick={()=>setFilter(f)} className={`px-3 py-1.5 rounded text-sm ${filter===f?'bg-blue-600 text-white':'bg-gray-200 text-gray-700'}`}>
             {f==='all'?`All (${totalDone}/${tasks.length} done)`:f}</button>)}
       </div>
       <div className="flex gap-2 items-center">
         <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)}/>Show completed</label>
-        <button onClick={addTask} className="px-3 py-1.5 rounded text-sm bg-green-600 text-white hover:bg-green-700">+ Add Task</button>
+        {!isContractor&&<button onClick={addTask} className="px-3 py-1.5 rounded text-sm bg-green-600 text-white hover:bg-green-700">+ Add Task</button>}
       </div>
     </div>
 
     <div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-left text-xs">
-          <th className="p-2 w-8">✓</th><th className="p-2">Task</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Priority</th><th className="p-2">Status</th><th className="p-2">Notes</th><th className="p-2 w-8"></th>
+          <th className="p-2 w-8">Done</th><th className="p-2">Task</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Priority</th><th className="p-2">Status</th><th className="p-2">Notes</th>{!isContractor&&<th className="p-2 w-8"></th>}
         </tr></thead>
         <tbody>
           {filtered.map(t=>(
@@ -522,7 +577,7 @@ function TasksTab(){
               </td>
               <td className="p-2"><StatusSelect value={t.status} onChange={v=>updateTask(t.id,'status',v)}/></td>
               <td className="p-2"><EditCell value={t.notes} onChange={v=>updateTask(t.id,'notes',v)} className="text-xs text-gray-500"/></td>
-              <td className="p-2"><button onClick={()=>removeTask(t.id)} className="text-red-300 hover:text-red-600 text-xs">✕</button></td>
+              {!isContractor&&<td className="p-2"><button onClick={()=>removeTask(t.id)} className="text-red-300 hover:text-red-600 text-xs">x</button></td>}
             </tr>
           ))}
         </tbody>
@@ -533,129 +588,126 @@ function TasksTab(){
 }
 
 // ============================================================
-// TAB 4: CONTRACT (with checkable redlines)
+// TAB 4: CONTRACT -- 16 flat items
 // ============================================================
-function ContractTab(){
-  const[checks,setChecks]=usePersist('contractChecks',{});
-  const toggle=(id)=>setChecks(p=>({...p,[id]:!p[id]}));
+function ContractTab({isContractor}){
+  const defaultStatuses={};
+  for(let i=1;i<=16;i++) defaultStatuses['item'+i]='Pending';
+  const[itemStatuses,setItemStatuses]=usePersist('contractItemStatuses',defaultStatuses);
 
-  const criticals=[
-    {id:'c1',title:'Fix Arbitration Clause',current:'References Indian "Arbitration and Conciliation Act, 1996"',risk:'Unenforceable in Arkansas.',redline:'Replace with: disputes in Circuit Court of Benton County, AR. Or Arkansas Uniform Arbitration Act (Ark. Code Ann. § 16-108-201 et seq.) with AAA.'},
-    {id:'c2',title:'Cap Overage Costs',current:'Rock, electrical, utilities excluded — no cap, no approval needed.',risk:'Unlimited financial exposure.',redline:'Add: "No overage work without signed Change Order. Total extras not to exceed $5,000 without written consent or Owner may terminate."'},
-    {id:'c3',title:'Add Notice Before Lien',current:'Builder can file lien immediately.',risk:'Title clouded over billing dispute.',redline:'Add: "Builder shall provide 10 days\' written Notice of Default before lien proceedings or work suspension."'},
-    {id:'c4',title:'Add Completion Deadline',current:'No end date. Start is "April +/- month."',risk:'Project drags indefinitely.',redline:'Add: "Substantial Completion within 90 days of Start Date, weather excepted. $50/day reduction for unexcused delay."'},
-    {id:'c5',title:'Increase Final Holdback to 10%',current:'Final draw is $1,000 (1.3%). 62% paid at shell delivery.',risk:'Zero punch list leverage.',redline:'Reduce Delivery draw to $22,280. Increase final to $7,920 (10%). Final due when ALL items delivered including cover and cleaner.'},
+  const updateStatus=(key,val)=>setItemStatuses(p=>({...p,[key]:val}));
+
+  const items=[
+    {num:1,key:'item1',title:'Fix arbitration clause (Indian law -> Arkansas law)',
+      language:'Replace "Arbitration and Conciliation Act, 1996" with: disputes resolved in Circuit Court of Benton County, AR, or under Arkansas Uniform Arbitration Act (Ark. Code Ann. 16-108-201 et seq.) with AAA rules.'},
+    {num:2,key:'item2',title:'Cap overage costs at $5,000 + require written approval',
+      language:'No overage work without signed Change Order. Total extras not to exceed $5,000 without written consent. Owner may terminate if exceeded without approval.'},
+    {num:3,key:'item3',title:'Add 10-day notice before lien filing',
+      language:'Builder shall provide 10 days\' written Notice of Default before lien proceedings or work suspension.'},
+    {num:4,key:'item4',title:'Add completion deadline (60 days from start, $50/day for delays)',
+      language:'Substantial Completion within 60 days of Start Date, weather delays excepted. $50/day reduction for each day of unexcused delay beyond deadline.'},
+    {num:5,key:'item5',title:'Define "Substantial Completion"',
+      language:'Substantial Completion means: pool holds water, all equipment operational, deck poured and cured, safety cover installed, passes final municipal inspection.'},
+    {num:6,key:'item6',title:'Builder-coordinated drainage, grading & landscaping plan',
+      language:'Builder shall coordinate with Owner\'s landscaper on drainage, grading, and site restoration. Builder responsible for ensuring proper slope away from pool and house.'},
+    {num:7,key:'item7',title:'Increase final holdback to 10% ($9,946)',
+      language:'Reduce Delivery draw to $30,282.25. Increase Final draw to $9,946.00 (10% of contract). Final due only upon Substantial Completion and Owner walkthrough.'},
+    {num:8,key:'item8',title:'Deposits refundable if builder fails to start within 45 days',
+      language:'If Builder fails to commence work within 45 days of the Approximate Start Date, all deposits shall be refundable upon Owner\'s written request.'},
+    {num:9,key:'item9',title:'Final payment tied to ALL contracted items (including cover)',
+      language:'Final payment due only upon delivery and installation of ALL contracted items including safety cover, robotic cleaner, and all equipment. Punch list items must be resolved.'},
+    {num:10,key:'item10',title:'Exempt builder-caused change orders from $100 fee',
+      language:'The $100 Change Order fee shall not apply to changes caused by Builder error, unforeseen site conditions discovered by Builder, or Builder-initiated design modifications.'},
+    {num:11,key:'item11',title:'Add free crystal upgrade to contract',
+      language:'Contract shall include Latham Crystal interior finish upgrade at no additional cost, contingent on pool order placed by April 24, 2026. If deadline missed, standard finish applies.'},
+    {num:12,key:'item12',title:'Reference PHTA/APSP workmanship standards',
+      language:'All work shall be performed in accordance with PHTA/APSP standards for residential swimming pool construction, including proper bonding, grounding, and barrier requirements.'},
+    {num:13,key:'item13',title:'Structural concrete crack warranty (>1/4" in first 12 months)',
+      language:'Builder warrants that structural concrete (deck, patio, basketball pad) shall be free from cracks exceeding 1/4 inch width for 12 months from date of pour. Hairline cracks excluded.'},
+    {num:14,key:'item14',title:'Document Burton\'s offered fence restoration contact (Eduardo)',
+      language:'Builder has recommended Eduardo [last name TBD] for fence restoration, French drain, and landscaping. Builder shall facilitate introduction and coordinate access timing.'},
+    {num:15,key:'item15',title:'Builder documents pre-construction condition, uses protective measures',
+      language:'Builder shall photograph and document pre-construction condition of property including driveway, fence, landscaping, and existing structures. Protective measures for driveway and adjacent property during construction.'},
+    {num:16,key:'item16',title:'Warranty period begins on date of Substantial Completion',
+      language:'All warranty periods (equipment, workmanship, structural) begin on the date of Substantial Completion as defined herein, not on date of individual installation.'},
   ];
 
-  const highs=[
-    {id:'h1',title:'Protect Deposits',text:'Deposits refundable if Builder fails to start within 45 days of Approximate Start Date.'},
-    {id:'h2',title:'Define Substantial Completion',text:'Pool holds water, all equipment operational, deck poured, passes final inspection.'},
-    {id:'h3',title:'Tie Final Payment to ALL Items',text:'Final due upon delivery of ALL contracted items, including safety cover and robotic cleaner.'},
-    {id:'h4',title:'Exempt Builder-Caused Change Orders from Fee',text:'No $100 fee for changes caused by builder error or site conditions.'},
-    {id:'h5',title:'Verify Setbacks Before Excavation',text:'Builder verifies pool placement meets Bentonville setback requirements.'},
-  ];
-
-  const niceToHaves=[
-    {id:'n1',t:'Reference PHTA/APSP workmanship standards'},
-    {id:'n2',t:'Structural concrete cracks (>1/4") covered under 1-year warranty'},
-    {id:'n3',t:'Builder restores fence or splits cost'},
-    {id:'n4',t:'Pre-construction photo documentation of property'},
-    {id:'n5',t:'Warranty starts at Substantial Completion'},
-    {id:'n6',t:'Owner termination for convenience (pay for completed work)'},
-    {id:'n7',t:'Concrete color sample approval 7 days before pour'},
-    {id:'n8',t:'Certificate of Insurance before work starts'},
-    {id:'n9',t:'AR contractor license # on contract face'},
-  ];
-
-  const allIds=[...criticals.map(c=>c.id),...highs.map(h=>h.id),...niceToHaves.map(n=>n.id)];
-  const doneCount=allIds.filter(id=>checks[id]).length;
+  const resolvedCount=items.filter(i=>{
+    const s=itemStatuses[i.key]||'Pending';
+    return s==='Accepted'||s==='Rejected';
+  }).length;
 
   return <div className="space-y-6">
-    <Card title={`📋 Contract Redline Tracker — ${doneCount}/${allIds.length} addressed`}>
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-        <div className="bg-blue-600 h-2 rounded-full transition-all" style={{width:`${allIds.length?doneCount/allIds.length*100:0}%`}}></div>
+    <Card title={`Contract Addendum Items -- ${resolvedCount}/16 resolved`}>
+      <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+        <div className="bg-blue-600 h-3 rounded-full transition-all" style={{width:`${resolvedCount/16*100}%`}}></div>
       </div>
-      <p className="text-xs text-gray-500 mb-4">Check off each item as you address it in your addendum to Burton.</p>
+      <div className="flex gap-4 text-xs text-gray-500 mb-4">
+        <span>Accepted: {items.filter(i=>(itemStatuses[i.key]||'Pending')==='Accepted').length}</span>
+        <span>Rejected: {items.filter(i=>(itemStatuses[i.key]||'Pending')==='Rejected').length}</span>
+        <span>Discussing: {items.filter(i=>(itemStatuses[i.key]||'Pending')==='Discussing').length}</span>
+        <span>Pending: {items.filter(i=>(itemStatuses[i.key]||'Pending')==='Pending').length}</span>
+      </div>
     </Card>
 
-    <Card title="🚨 CRITICAL — Must-Have Before Signing">
-      <div className="space-y-4">
-        {criticals.map(item=>(
-          <label key={item.id} className={`block pl-4 py-3 rounded-r cursor-pointer transition ${checks[item.id]?'bg-green-50 border-l-4 border-green-400 opacity-60':'bg-red-50 border-l-4 border-red-400'}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <input type="checkbox" checked={!!checks[item.id]} onChange={()=>toggle(item.id)} className="w-4 h-4"/>
-              <Badge color={checks[item.id]?'green':'red'}>{checks[item.id]?'DONE':'CRITICAL'}</Badge>
-              <span className={`font-bold text-sm ${checks[item.id]?'line-through':''}`}>{item.title}</span>
-            </div>
-            {!checks[item.id]&&<div className="text-sm space-y-1 ml-6">
-              <div><span className="text-gray-500">Current:</span> {item.current}</div>
-              <div><span className="text-gray-500">Risk:</span> <span className="text-red-700">{item.risk}</span></div>
-              <div className="bg-white p-2 rounded border border-red-200 mt-2">
-                <span className="text-xs text-red-600 font-semibold">PROPOSED LANGUAGE:</span>
-                <div className="text-xs mt-1 font-mono">{item.redline}</div>
+    <Card title="All 16 Contract Items">
+      <div className="space-y-3">
+        {items.map(item=>{
+          const status=itemStatuses[item.key]||'Pending';
+          const borderColor=status==='Accepted'?'border-green-400':status==='Rejected'?'border-red-400':status==='Discussing'?'border-amber-400':'border-gray-300';
+          const bgColor=status==='Accepted'?'bg-green-50':status==='Rejected'?'bg-red-50':status==='Discussing'?'bg-amber-50':'bg-white';
+          return <div key={item.key} className={`p-4 rounded-lg border-l-4 ${borderColor} ${bgColor} ${status==='Accepted'||status==='Rejected'?'opacity-70':''}`}>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-gray-400 w-6">#{item.num}</span>
+                <span className={`font-semibold text-sm ${status==='Accepted'||status==='Rejected'?'line-through':''}`}>{item.title}</span>
               </div>
-            </div>}
-          </label>
-        ))}
-      </div>
-    </Card>
-
-    <Card title="⚠️ HIGH Priority Redlines">
-      <div className="space-y-3 text-sm">
-        {highs.map(item=>(
-          <label key={item.id} className={`block pl-4 py-2 rounded-r cursor-pointer ${checks[item.id]?'bg-green-50 border-l-4 border-green-400 opacity-60':'bg-amber-50 border-l-4 border-amber-400'}`}>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" checked={!!checks[item.id]} onChange={()=>toggle(item.id)} className="w-4 h-4"/>
-              <Badge color={checks[item.id]?'green':'amber'}>{checks[item.id]?'DONE':'HIGH'}</Badge>
-              <span className={`font-semibold ${checks[item.id]?'line-through':''}`}>{item.title}</span>
+              <ContractStatusSelect value={status} onChange={v=>updateStatus(item.key,v)}/>
             </div>
-            {!checks[item.id]&&<div className="text-xs font-mono bg-white p-2 rounded border border-amber-200 ml-6 mt-1">{item.text}</div>}
-          </label>
-        ))}
+            {/* Show proposed language unless contractor mode or already resolved */}
+            {!isContractor&&status!=='Accepted'&&status!=='Rejected'&&<div className="ml-9 mt-2 p-3 bg-white rounded border text-xs font-mono text-gray-700">
+              <span className="text-xs text-blue-600 font-semibold font-sans">PROPOSED LANGUAGE: </span>
+              {item.language}
+            </div>}
+            {isContractor&&status!=='Accepted'&&status!=='Rejected'&&<div className="ml-9 mt-1 text-xs text-gray-500">
+              Review proposed addendum language for this item.
+            </div>}
+          </div>;
+        })}
       </div>
     </Card>
 
-    <Card title="📝 Nice-to-Have Redlines">
-      <div className="space-y-2 text-sm">
-        {niceToHaves.map(item=>(
-          <label key={item.id} className={`flex items-center gap-2 pl-4 py-1.5 rounded-r cursor-pointer border-l-4 ${checks[item.id]?'border-green-400 bg-green-50 opacity-60':'border-blue-400'}`}>
-            <input type="checkbox" checked={!!checks[item.id]} onChange={()=>toggle(item.id)} className="w-4 h-4"/>
-            <span className={checks[item.id]?'line-through':''}>{item.t}</span>
-          </label>
-        ))}
-      </div>
-    </Card>
-
-    <Card title="🔍 Verbal Commitments — Must Get in Writing">
+    {/* Verbal Commitments -- homeowner only */}
+    {!isContractor&&<Card title="Verbal Commitments Tracker">
       <VerbalCommitments/>
-    </Card>
+    </Card>}
   </div>;
 }
 
 function VerbalCommitments(){
-  const[checks,setChecks]=usePersist('verbalChecks',{});
-  const toggle=(id)=>setChecks(p=>({...p,[id]:!p[id]}));
   const items=[
-    {id:'v1',c:'Free crystal upgrade if ordered by Apr 24',src:'Mar 12'},
-    {id:'v2',c:'Extra concrete at $12/sqft',src:'Mar 12'},
-    {id:'v3',c:'Gutter tie-ins at $250 each (3 total)',src:'Mar 12'},
-    {id:'v4',c:'Umbrella anchors included in concrete',src:'Mar 12'},
-    {id:'v5',c:'Heater at $5,400',src:'Mar 12'},
-    {id:'v6',c:'Hot tub at $5-7K',src:'Mar 12'},
-    {id:'v7',c:'Burton does concrete in-house (not subbed)',src:'Mar 12'},
-    {id:'v8',c:'First week of May start, 4-5 week build',src:'Mar 12'},
-    {id:'v9',c:'Burton handles all permits',src:'Mar 12'},
-    {id:'v10',c:'Will connect Lance with Eduardo (landscaper)',src:'Mar 12'},
+    {id:'v1',commitment:'Heater at $5,400',src:'Mar 12',inContract:true,note:'IN CONTRACT'},
+    {id:'v2',commitment:'Gutter tie-ins ($950 for 3 + deck drain)',src:'Mar 12',inContract:true,note:'IN CONTRACT'},
+    {id:'v3',commitment:'Concrete at $10.95/sf (1,270 sf)',src:'Mar 12',inContract:true,note:'IN CONTRACT'},
+    {id:'v4',commitment:'Crystal upgrade (free if ordered by Apr 24)',src:'Mar 12',inContract:false,note:'NOT in contract -- need to add (item #11)'},
+    {id:'v5',commitment:'Hot tub at $5-7K',src:'Mar 12',inContract:false,note:'NOT in contract (separate purchase, correct)'},
+    {id:'v6',commitment:'First week of May start, 4-5 weeks',src:'Mar 12',inContract:false,note:'NOT in contract'},
+    {id:'v7',commitment:'Burton does concrete in-house',src:'Mar 12',inContract:false,note:'NOT in contract'},
+    {id:'v8',commitment:'Burton handles all permits',src:'Mar 12',inContract:true,note:'IN CONTRACT'},
+    {id:'v9',commitment:'Eduardo connection for landscaping/fence',src:'Mar 12',inContract:false,note:'NOT in contract'},
+    {id:'v10',commitment:'Umbrella anchors in concrete',src:'Mar 12',inContract:false,note:'NOT in contract'},
   ];
+
   return <table className="w-full text-sm">
-    <thead><tr className="bg-gray-50"><th className="p-2 w-8">✓</th><th className="p-2 text-left">Commitment</th><th className="p-2">Date</th><th className="p-2">In Writing?</th></tr></thead>
+    <thead><tr className="bg-gray-50"><th className="p-2 text-left">Commitment</th><th className="p-2">Date</th><th className="p-2">Status</th></tr></thead>
     <tbody>
       {items.map(i=>(
-        <tr key={i.id} className={`border-t ${checks[i.id]?'opacity-50':''}`}>
-          <td className="p-2 text-center"><input type="checkbox" checked={!!checks[i.id]} onChange={()=>toggle(i.id)}/></td>
-          <td className={`p-2 ${checks[i.id]?'line-through':''}`}>{i.c}</td>
-          <td className="p-2">{i.src}</td>
-          <td className="p-2">{checks[i.id]?<Badge color="green">GOT IT</Badge>:<Badge color="red">NO</Badge>}</td>
+        <tr key={i.id} className={`border-t ${i.inContract?'bg-green-50':''}`}>
+          <td className="p-2 font-medium">{i.commitment}</td>
+          <td className="p-2 text-gray-500">{i.src}</td>
+          <td className="p-2">{i.inContract?<Badge color="green">IN CONTRACT</Badge>:<Badge color="red">NOT IN CONTRACT</Badge>}
+            <span className="text-xs text-gray-500 ml-2">{i.note.replace('IN CONTRACT','').replace('NOT in contract','').replace(' -- ','').replace('(','').replace(')','').trim()}</span>
+          </td>
         </tr>
       ))}
     </tbody>
@@ -666,37 +718,46 @@ function VerbalCommitments(){
 // TAB 5: ORDERS
 // ============================================================
 function OrdersTab(){
-  const[checks,setChecks]=usePersist('orderChecks',{});
+  const[checks,setChecks]=usePersist('orderChecks_v3',{});
   const toggle=(id)=>setChecks(p=>({...p,[id]:!p[id]}));
 
   const burtonItems=[
-    {id:'o1',item:'Fiberglass Shell',detail:'Latham Claremont 14×33\' + Crystal upgrade'},
-    {id:'o2',item:'Variable Speed Pump',detail:'Super-Flo variable speed'},
-    {id:'o3',item:'Premium Cartridge Filter',detail:'Dual filtration system'},
-    {id:'o4',item:'Salt System',detail:'Auto chlorinator'},
-    {id:'o5',item:'Automation System',detail:'Phone control, 2 items'},
-    {id:'o6',item:'2 LED Underwater Lights',detail:'Included (keep or decline?)'},
-    {id:'o7',item:'Robotic Pool Cleaner',detail:'Included'},
-    {id:'o8',item:'Ultra Mesh Safety Cover',detail:'May lag — verify in contract'},
-    {id:'o9',item:'Starting Chemicals',detail:'Startup kit at fill'},
-    {id:'o10',item:'1 Load Top Soil',detail:'Backfill/grading'},
-    {id:'o11',item:'Building Permit + Sales Tax',detail:'Burton handles'},
+    {id:'o1',item:'Fiberglass Shell',detail:'Latham Claremont 14x33\' + Crystal upgrade (if ordered by Apr 24)'},
+    {id:'o2',item:'Variable Speed Smart Pump',detail:'Intelliflo 3 w/ IO board'},
+    {id:'o3',item:'Filter',detail:'Pentair cartridge filter'},
+    {id:'o4',item:'Pre-Filter',detail:'Cyclone centrifugal filter'},
+    {id:'o5',item:'Skimmer',detail:'Gray, wide mouth'},
+    {id:'o6',item:'Wall Returns (x3)',detail:'Fiberglass wall fitting'},
+    {id:'o7',item:'LED Lights (x2)',detail:'Pentair Microbrite'},
+    {id:'o8',item:'Automatic Cleaner',detail:'Beatbot A-100 robotic cleaner'},
+    {id:'o9',item:'1 Load Top Soil',detail:'Backfill / grading'},
+    {id:'o10',item:'Maintenance Equipment',detail:'Brush, vac head/pole, net, thermometer, test strips'},
+    {id:'o11',item:'Safety Cover',detail:'High shade mesh'},
+    {id:'o12',item:'Winterizing Equipment',detail:'Winter plugs'},
+    {id:'o13',item:'Salt System',detail:'IC30'},
+    {id:'o14',item:'Electric Heater',detail:'Crosswind w/ chill feature ($5,400)'},
+    {id:'o15',item:'Gutter Ties (x3)',detail:'Pipe underground'},
+    {id:'o16',item:'Deck Drain',detail:'Cardinal, 30\''},
+    {id:'o17',item:'Coping',detail:'Cantilever, stamp aform'},
+    {id:'o18',item:'Concrete',detail:'1,270 sf @ $10.95/sf (bball court, patio overlay, extra beyond 3\' border)'},
+    {id:'o19',item:'Building Permit + Sales Tax',detail:'Burton handles'},
+    {id:'o20',item:'Starting Chemicals',detail:'Startup kit at fill'},
   ];
 
   const homeItems=[
     {id:'h1',item:'Hot tub',cost:'$5,000-$7,000',when:'Mar-Apr (pick model)',notes:'Confirmed. Above ground on concrete pad.'},
     {id:'h2',item:'Pool basketball hoop',cost:'$250-$300',when:'May',notes:'Shorter poolside style'},
-    {id:'h3',item:'Outdoor loungers (×4-6)',cost:'$400-$1,200',when:'May-Jun',notes:''},
+    {id:'h3',item:'Outdoor loungers (x4-6)',cost:'$400-$1,200',when:'May-Jun',notes:''},
     {id:'h4',item:'Patio table + chairs',cost:'$300-$800',when:'May-Jun',notes:''},
-    {id:'h5',item:'Patio umbrella(s)',cost:'$100-$300',when:'May-Jun',notes:'Burton embeds anchors'},
+    {id:'h5',item:'Patio umbrella(s)',cost:'$100-$300',when:'May-Jun',notes:'Umbrella anchors in concrete (verbal)'},
     {id:'h6',item:'Pool maintenance supplies',cost:'~$50-100/mo',when:'At startup',notes:'Test kit, skimmer, brush, chemicals'},
     {id:'h7',item:'Spa screening (wall/shrubs)',cost:'TBD',when:'After concrete',notes:'Can phase later'},
   ];
 
   return <div className="space-y-6">
-    <Card title="📦 Burton-Provided Items (in $79,200)">
+    <Card title={`Burton-Provided Items (in $99,456.50 contract)`}>
       <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50"><th className="p-2 w-8">✓</th><th className="p-2 text-left">Item</th><th className="p-2">Details</th></tr></thead>
+        <thead><tr className="bg-gray-50"><th className="p-2 w-8">Rcvd</th><th className="p-2 text-left">Item</th><th className="p-2">Details</th></tr></thead>
         <tbody>{burtonItems.map(i=>(
           <tr key={i.id} className={`border-t ${checks[i.id]?'opacity-50':''}`}>
             <td className="p-2 text-center"><input type="checkbox" checked={!!checks[i.id]} onChange={()=>toggle(i.id)}/></td>
@@ -707,9 +768,9 @@ function OrdersTab(){
       </table>
     </Card>
 
-    <Card title="🛒 Homeowner Purchases">
+    <Card title="Homeowner Purchases">
       <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50"><th className="p-2 w-8">✓</th><th className="p-2 text-left">Item</th><th className="p-2">Cost</th><th className="p-2">When</th><th className="p-2">Notes</th></tr></thead>
+        <thead><tr className="bg-gray-50"><th className="p-2 w-8">Got</th><th className="p-2 text-left">Item</th><th className="p-2">Cost</th><th className="p-2">When</th><th className="p-2">Notes</th></tr></thead>
         <tbody>{homeItems.map(i=>(
           <tr key={i.id} className={`border-t ${checks[i.id]?'opacity-50':''}`}>
             <td className="p-2 text-center"><input type="checkbox" checked={!!checks[i.id]} onChange={()=>toggle(i.id)}/></td>
@@ -722,7 +783,7 @@ function OrdersTab(){
       </table>
     </Card>
 
-    <Card title="📇 Vendor Contacts">
+    <Card title="Vendor Contacts">
       <VendorContacts/>
     </Card>
   </div>;
@@ -731,9 +792,9 @@ function OrdersTab(){
 function VendorContacts(){
   const[vendors,setVendors]=usePersist('vendors',[
     {name:'Burton Pools',contact:'Whitlee',phone:'479-756-5511',role:'Pool contractor'},
-    {name:'Eduardo (landscaper)',contact:'TBD',phone:'TBD — Whitlee to connect',role:'French drain, fence, landscaping'},
+    {name:'Eduardo (landscaper)',contact:'TBD',phone:'TBD -- Whitlee to connect',role:'French drain, fence, landscaping'},
     {name:'Jim (realtor)',contact:'Jim',phone:'On file',role:'Trusted advisor'},
-    {name:'Sam (neighbor)',contact:'Next door',phone:'—',role:'Has pool — consult'},
+    {name:'Sam (neighbor)',contact:'Next door',phone:'--',role:'Has pool -- consult'},
   ]);
   const update=(i,f,v)=>setVendors(p=>p.map((e,j)=>j===i?{...e,[f]:v}:e));
   const add=()=>setVendors(p=>[...p,{name:'',contact:'',phone:'',role:''}]);
@@ -748,7 +809,7 @@ function VendorContacts(){
           <td className="p-2"><EditCell value={v.contact} onChange={val=>update(i,'contact',val)}/></td>
           <td className="p-2"><EditCell value={v.phone} onChange={val=>update(i,'phone',val)}/></td>
           <td className="p-2"><EditCell value={v.role} onChange={val=>update(i,'role',val)}/></td>
-          <td className="p-2"><button onClick={()=>remove(i)} className="text-red-300 hover:text-red-600 text-xs">✕</button></td>
+          <td className="p-2"><button onClick={()=>remove(i)} className="text-red-300 hover:text-red-600 text-xs">x</button></td>
         </tr>
       ))}</tbody>
     </table>
@@ -757,7 +818,7 @@ function VendorContacts(){
 }
 
 // ============================================================
-// TAB 6: RISKS & DECISIONS
+// TAB 6: RISKS & DECISIONS (homeowner only)
 // ============================================================
 function RisksTab(){
   const[decisionChecks,setDecisionChecks]=usePersist('decisionChecks',{d1:true,d2:true});
@@ -765,30 +826,29 @@ function RisksTab(){
 
   const openDecisions=[
     {id:'d1',decision:'Hot tub: Yes or No?',deadline:'Mar 19',impact:'Confirmed YES. Now need to pick model/brand.',owner:'Lance & Missy'},
-    {id:'d2',decision:'Heater: Yes or No?',deadline:'Mar 19',impact:'Confirmed YES. $5,400.',owner:'Lance & Missy'},
-    {id:'d3',decision:'Repour existing patio?',deadline:'Mar 19',impact:'Saves ~$3,600 if skipped. New looks seamless, raises 4in.',owner:'Lance & Missy'},
-    {id:'d4',decision:'Automatic pool cover?',deadline:'Before signing',impact:'Safety + convenience. No price yet.',owner:'Lance'},
-    {id:'d5',decision:'Final pool color',deadline:'At order',impact:'Dark gray/black preferred. Crystal upgrade free by Apr 24.',owner:'Lance & Missy'},
-    {id:'d6',decision:'LED lights: keep or remove?',deadline:'Before signing',impact:'2 included. Master sheet said NO.',owner:'Lance & Missy'},
-    {id:'d7',decision:'Hot tub model/brand selection',deadline:'Mar 26',impact:'Need options from Whitlee first.',owner:'Lance & Missy'},
-    {id:'d8',decision:'Basketball pad dimensions',deadline:'Before concrete',impact:'Currently 15×20.',owner:'Lance'},
+    {id:'d2',decision:'Heater: Yes or No?',deadline:'Mar 19',impact:'Confirmed YES. $5,400. In contract.',owner:'Lance & Missy'},
+    {id:'d3',decision:'Automatic pool cover?',deadline:'Before signing',impact:'Safety + convenience. No price yet.',owner:'Lance'},
+    {id:'d4',decision:'Final pool color',deadline:'At order',impact:'Dark gray/black preferred. Crystal upgrade free by Apr 24.',owner:'Lance & Missy'},
+    {id:'d5',decision:'Hot tub model/brand selection',deadline:'By Apr',impact:'Need options from Whitlee first.',owner:'Lance & Missy'},
+    {id:'d6',decision:'Verify concrete sf (1,270 in contract vs ~1,100 discussed)',deadline:'Before signing',impact:'$170 sf difference at $10.95 = ~$1,862 difference.',owner:'Lance'},
   ];
 
   return <div className="space-y-6">
-    <Card title="⚠️ Risk Register">
+    <Card title="Risk Register">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-left text-xs"><th className="p-2">Risk</th><th className="p-2">Likelihood</th><th className="p-2">Impact</th><th className="p-2">Mitigation</th></tr></thead>
         <tbody>
           {[
-            ['Spring rain delays','Medium','Medium','Built into 4-5 wk estimate. Add completion deadline.'],
-            ['Underground rock','Medium','High','NWA is rocky. $5K cap in contract. Written approval.'],
+            ['Spring rain delays','Medium','Medium','Built into 4-5 wk estimate. Add completion deadline (item #4).'],
+            ['Underground rock','Medium','High','NWA is rocky. $5K cap in contract (item #2). Written approval.'],
             ['Scope creep','High','Medium','Lock scope. All additions via written change orders.'],
-            ['Builder defaults mid-project','Low','High','Rebalance draws. Verify insurance.'],
-            ['Drainage issues post-build','Medium','Medium','French drain + gutter tie-ins planned.'],
+            ['Builder defaults mid-project','Low','High','Rebalance draws (item #7). Verify insurance.'],
+            ['Drainage issues post-build','Medium','Medium','French drain + gutter tie-ins in contract. Coordination plan (item #6).'],
             ['Pool violates setbacks','Low','High','Neighbor has pool. Verify before signing.'],
             ['Shell delivery delay','Low','High','Order early. Crystal deadline motivates.'],
             ['Hot tub electrical exceeds standard','Medium','Medium','Verify panel capacity. Non-standard is extra.'],
-            ['Fence damage beyond repair','Medium','Low','Eduardo handles. Pre-construction photos.'],
+            ['Fence damage beyond repair','Medium','Low','Eduardo handles. Pre-construction photos (item #15).'],
+            ['Concrete sf discrepancy','Medium','Medium','Contract says 1,270 sf. Verify breakdown matches layout.'],
           ].map((r,i)=><tr key={i} className="border-t">
             <td className="p-2 font-medium">{r[0]}</td>
             <td className="p-2"><Badge color={r[1]==='High'?'red':r[1]==='Medium'?'amber':'green'}>{r[1]}</Badge></td>
@@ -799,7 +859,7 @@ function RisksTab(){
       </table>
     </Card>
 
-    <Card title="❓ Decisions — Check Off When Made">
+    <Card title="Decisions -- Check Off When Made">
       <div className="space-y-2">
         {openDecisions.map(d=>(
           <label key={d.id} className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition ${decisionChecks[d.id]?'bg-green-50 border-green-300 opacity-60':'bg-amber-50 border-amber-200'}`}>
@@ -807,32 +867,34 @@ function RisksTab(){
             <div className="text-sm flex-1">
               <div className={`font-bold ${decisionChecks[d.id]?'line-through':''}`}>{d.decision}</div>
               <div className="text-gray-600">{d.impact}</div>
-              <div className="text-xs text-gray-400 mt-1">{d.owner} · by {d.deadline}</div>
+              <div className="text-xs text-gray-400 mt-1">{d.owner} -- by {d.deadline}</div>
             </div>
           </label>
         ))}
       </div>
     </Card>
 
-    <Card title="📝 Decision Log (Confirmed)">
+    <Card title="Decision Log (Confirmed)">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50"><th className="p-2 text-left">Decision</th><th className="p-2">Date</th><th className="p-2">Who</th></tr></thead>
         <tbody>
           {[
             ['Pool type: Fiberglass','2025','Lance & Missy'],
-            ['Model: Latham Claremont 14×33\'','Feb 2026','Lance & Missy'],
+            ['Model: Latham Claremont 14x33\'','Feb 2026','Lance & Missy'],
             ['Contractor: Burton Pools','2025','Lance'],
             ['Heater: YES ($5,400)','Mar 2026','Lance & Missy'],
             ['Hot Tub: YES (~$7K, above ground, model TBD)','Mar 2026','Lance & Missy'],
             ['No buried hot tub','Mar 12','Lance & Missy'],
             ['Shallow end on basketball side','Mar 12','Whitlee'],
             ['8ft concrete house side, 3ft back & far','Mar 12','Lance & Missy'],
-            ['Basketball: separate 15×20 pad','Mar 12','Lance'],
+            ['Basketball: separate pad (360 sf)','Mar 12','Lance'],
             ['Access: left side from street','Mar 12','Whitlee'],
             ['Remove trampoline','Mar 12','Missy'],
             ['No diving board','2025','Lance'],
             ['Dark/black-gray pool color','2025','Missy'],
             ['No waterfall/fancy features','2025','Lance & Missy'],
+            ['Concrete at $10.95/sf ($1 discount)','Mar 2026','Whitlee'],
+            ['Contract total: $99,456.50','Mar 2026','Burton'],
           ].map((r,i)=><tr key={i} className="border-t"><td className="p-2">{r[0]}</td><td className="p-2 text-gray-500">{r[1]}</td><td className="p-2 text-gray-500">{r[2]}</td></tr>)}
         </tbody>
       </table>
@@ -849,26 +911,27 @@ function CommsTab(){
 
   const photos=[
     {id:'p1',stage:'Pre-construction',detail:'Entire yard all sides. Driveway. Fence. Patio. Drainage areas.'},
-    {id:'p2',stage:'Spray paint layout',detail:'Pool outline, concrete areas, basketball. (Done Mar 12 — PHOTO NOW)'},
+    {id:'p2',stage:'Spray paint layout',detail:'Pool outline, concrete areas, basketball. (Done Mar 12 -- PHOTO NOW)'},
     {id:'p3',stage:'Excavation',detail:'Hole depth, soil, any rock.'},
     {id:'p4',stage:'Shell set',detail:'Shell in hole, level check, alignment.'},
     {id:'p5',stage:'Plumbing before backfill',detail:'All pipes, return ports (NOT in front of skimmers), floor drains.'},
     {id:'p6',stage:'Electrical before cover-up',detail:'Wiring, bonding, GFCI.'},
-    {id:'p7',stage:'Concrete forms',detail:'Before pour — layout, rebar, drain, anchors.'},
+    {id:'p7',stage:'Concrete forms',detail:'Before pour -- layout, rebar, drain, anchors.'},
     {id:'p8',stage:'Concrete pour',detail:'During and after. Color. Slope direction.'},
-    {id:'p9',stage:'Equipment pad',detail:'Pump, filter, salt, automation, heater — installed and running.'},
+    {id:'p9',stage:'Equipment pad',detail:'Pump, filter, salt, automation, heater -- installed and running.'},
     {id:'p10',stage:'Final / punch list',detail:'Everything complete. Cosmetic issues. Cleanup.'},
   ];
 
   const photoDone=Object.values(photoChecks).filter(Boolean).length;
 
   return <div className="space-y-6">
-    <Card title="📞 Communication History">
+    <Card title="Communication History">
       <div className="space-y-4 text-sm">
         {[
-          {date:'Sep 2025',type:'Text + Visit',s:'Initial outreach. Whitlee visited. Quoted Aruba 11×22 ($50,750) and 12×24 vinyl ($57,687). Noted tight access and setback concerns.'},
+          {date:'Sep 2025',type:'Text + Visit',s:'Initial outreach. Whitlee visited. Quoted Aruba 11x22 ($50,750) and 12x24 vinyl ($57,687). Noted tight access and setback concerns.'},
           {date:'Feb 2026',type:'Text',s:'Re-engaged. Updated fiberglass quotes requested. Whitlee sent Latham/Thursday catalogs. Claremont $79,200 and Kingston $92,700 quotes delivered.'},
-          {date:'Mar 12, 2026',type:'On-Site Visit',s:'Layout walkthrough. Spray painted pool placement. Discussed: concrete (8ft house, 3ft else, basketball 15×20, patio repour), gutters ($250ea), deck drain, hot tub (above ground near house), heater ($5,400), hot tub ($5-7K), crystal upgrade (free by Apr 24), schedule (1st wk May, 4-5 wks), Eduardo referral. Draft contract provided (NOT signed).'},
+          {date:'Mar 12, 2026',type:'On-Site Visit',s:'Layout walkthrough. Spray painted pool placement. Discussed: concrete (8ft house, 3ft else, basketball, patio overlay), gutters ($250ea x3), deck drain, hot tub (above ground near house), heater ($5,400), crystal upgrade (free by Apr 24), schedule (1st wk May, 4-5 wks), Eduardo referral. Draft contract provided (NOT signed).'},
+          {date:'Mar 2026',type:'Contract',s:'Received formal contract: $99,456.50. Includes heater ($5,400), drainage ($950), concrete 1,270 sf at $10.95/sf ($13,906.50), salt system (free incentive), $7,000 Claremont discount. Preparing addendum with 16 items.'},
         ].map((c,i)=>(
           <div key={i} className="flex gap-3 border-l-2 border-blue-300 pl-3">
             <div className="text-xs text-gray-400 w-24 shrink-0">{c.date}<br/><Badge color="blue">{c.type}</Badge></div>
@@ -878,7 +941,7 @@ function CommsTab(){
       </div>
     </Card>
 
-    <Card title={`📸 Photo Documentation — ${photoDone}/${photos.length} stages captured`}>
+    <Card title={`Photo Documentation -- ${photoDone}/${photos.length} stages captured`}>
       <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
         <div className="bg-green-600 h-2 rounded-full transition-all" style={{width:`${photos.length?photoDone/photos.length*100:0}%`}}></div>
       </div>
@@ -894,9 +957,9 @@ function CommsTab(){
       </div>
     </Card>
 
-    <Card title="📋 Weekly Check-In Template">
+    <Card title="Weekly Check-In Template">
       <div className="bg-gray-50 p-4 rounded font-mono text-sm whitespace-pre-wrap">
-{`Hey Whitlee — weekly check-in:
+{`Hey Whitlee -- weekly check-in:
 
 1. What was completed this week?
 2. What's planned for next week?
@@ -904,9 +967,9 @@ function CommsTab(){
 4. Still on track for [completion date]?
 5. Any inspections coming up?
 
-Thanks! — Lance`}
+Thanks! -- Lance`}
       </div>
-      <button onClick={()=>{navigator.clipboard.writeText(`Hey Whitlee — weekly check-in:\n\n1. What was completed this week?\n2. What's planned for next week?\n3. Any issues, delays, or decisions needed?\n4. Still on track for [completion date]?\n5. Any inspections coming up?\n\nThanks! — Lance`)}} className="mt-2 text-xs text-blue-600 hover:underline">📋 Copy to clipboard</button>
+      <button onClick={()=>{navigator.clipboard.writeText(`Hey Whitlee -- weekly check-in:\n\n1. What was completed this week?\n2. What's planned for next week?\n3. Any issues, delays, or decisions needed?\n4. Still on track for [completion date]?\n5. Any inspections coming up?\n\nThanks! -- Lance`)}} className="mt-2 text-xs text-blue-600 hover:underline">Copy to clipboard</button>
     </Card>
   </div>;
 }
